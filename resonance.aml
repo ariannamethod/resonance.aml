@@ -1,0 +1,75 @@
+# resonance.aml — Resonance 200M Yent SFT (LoRA-merged) inference in AML.
+#
+# Resonance is the second face of Yent. Janus 176M is one — yent.aml drives
+# that. Resonance 200M is the other. Different architecture: dual attention
+# (Content + RRPRAM low-rank), parametric RMSNorm, sigmoid per-head gate,
+# no smear / no residual lambdas / no backout. Trained on ClimbMix base
+# then SFT on Yent identity dataset.
+#
+# Pipeline: .aml → amlc → C → cc + libnotorch + libaml + Accelerate
+#         → load resonance_200m_lora_yent.bin (LoRA-merged into base)
+#         → embedded BPE (16384 vocab, 16128 merges)
+#         → forward + sample (rep_penalty + no-repeat 3-gram + top-p +
+#           AML Dario field overlay + prophecy debt + Kuramoto chambers)
+#
+# By Arianna Method. הרזוננס לא נשבר
+
+ECHO "tools/resonance_forward.h"
+
+BLOOD COMPILE resonance_headers {
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+}
+
+BLOOD COMPILE resonance_runtime {
+static int resonance_init(ResonanceCtx *ctx, const char *path) {
+    if (resonance_load(ctx, path)) return 1;
+
+    /* AML Dario field — same wiring as yent.aml. PROPHECY 12, DESTINY 0.35,
+     * VELOCITY WALK, FIELD ON. The field tracks Hebbian co-occurrence,
+     * prophecy fulfillment, destiny attraction, and 6 Kuramoto chambers
+     * across the 11 internal steps that surround each emission. */
+    am_init();
+    am_reset_field();
+    am_reset_debt();
+    int rc = am_exec(
+        "PROPHECY 12\n"
+        "DESTINY 0.35\n"
+        "VELOCITY WALK\n"
+        "FIELD ON\n"
+        "RESONANCE 0.5\n"
+    );
+    if (rc != 0)
+        fprintf(stderr, "[resonance] am_exec rc=%d (%s)\n", rc, am_get_error());
+    fprintf(stderr, "[resonance] Dario field active (PROPHECY 12, DESTINY 0.35, VELOCITY WALK)\n");
+    return 0;
+}
+}
+
+BLOOD MAIN {
+int main(int argc, char **argv) {
+    const char *weights_path = "weights/resonance_200m/resonance_200m_lora_yent.bin";
+    const char *prompt       = "Q: Who are you?\nA:";
+    int   max_tokens         = 100;
+    float temp               = 0.7f;
+    float top_p              = 0.9f;
+
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "-w") && i + 1 < argc)        weights_path = argv[++i];
+        else if (!strcmp(argv[i], "-p") && i + 1 < argc)   prompt       = argv[++i];
+        else if (!strcmp(argv[i], "-n") && i + 1 < argc)   max_tokens   = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "-t") && i + 1 < argc)   temp         = atof(argv[++i]);
+        else if (!strcmp(argv[i], "--top-p") && i + 1 < argc) top_p     = atof(argv[++i]);
+    }
+
+    srand((unsigned)time(NULL));
+
+    ResonanceCtx ctx = {0};
+    if (resonance_init(&ctx, weights_path)) return 1;
+    resonance_generate(&ctx, prompt, max_tokens, temp, top_p);
+    resonance_free(&ctx);
+    return 0;
+}
+}

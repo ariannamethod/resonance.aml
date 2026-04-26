@@ -1,0 +1,18 @@
+# amlc build artifacts
+resonance
+resonance.c
+resonance_smoke
+resonance_smoke.c
+
+# weights — local only
+weights/
+*.bin
+*.pt
+*.gguf
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
