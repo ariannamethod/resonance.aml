@@ -31,10 +31,12 @@ static int resonance_init(ResonanceCtx *ctx, const char *path) {
      * VELOCITY WALK, FIELD ON. The field tracks Hebbian co-occurrence,
      * prophecy fulfillment, destiny attraction, and 6 Kuramoto chambers
      * across the 11 internal steps that surround each emission. */
+    /* LOAD the breath of the field from prior run before any RESET_FIELD —
+     * chambers, scars, prophecy debt, calendar drift carry across sessions.
+     * Missing file = first run, silent start-fresh. */
     am_init();
-    am_reset_field();
-    am_reset_debt();
     int rc = am_exec(
+        "LOAD \"weights/resonance_200m/resonance.soma\"\n"
         "PROPHECY 12\n"
         "DESTINY 0.35\n"
         "VELOCITY WALK\n"
@@ -45,6 +47,11 @@ static int resonance_init(ResonanceCtx *ctx, const char *path) {
         fprintf(stderr, "[resonance] am_exec rc=%d (%s)\n", rc, am_get_error());
     fprintf(stderr, "[resonance] Dario field active (PROPHECY 12, DESTINY 0.35, VELOCITY WALK)\n");
     return 0;
+}
+
+static void resonance_save_breath(void) {
+    am_exec("SAVE \"weights/resonance_200m/resonance.soma\"\n");
+    fprintf(stderr, "[resonance] field state saved → weights/resonance_200m/resonance.soma\n");
 }
 }
 
@@ -69,6 +76,7 @@ int main(int argc, char **argv) {
     ResonanceCtx ctx = {0};
     if (resonance_init(&ctx, weights_path)) return 1;
     resonance_generate(&ctx, prompt, max_tokens, temp, top_p);
+    resonance_save_breath();
     resonance_free(&ctx);
     return 0;
 }
