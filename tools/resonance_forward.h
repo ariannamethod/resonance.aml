@@ -20,9 +20,14 @@
 /* Config from RS02 header */
 static int V, E, H, D, B, M, T, R;
 
-/* Helpers */
+/* Helpers — BLAS via notorch.
+ *   mm_t(C, A, B, m, k, n) — cblas_sgemm (used by future prefill_batch).
+ *   matvec_t(out, W, x, n, k) — cblas_sgemv, the per-token hot-loop path. */
 static void mm_t(float *C, const float *A, const float *BT, int m, int k, int n) {
     nt_blas_mmT(C, A, BT, m, k, n);
+}
+static void matvec_t(float *out, const float *W, const float *x, int n, int k) {
+    nt_blas_matvec(out, W, x, n, k);
 }
 
 /* Parametric RMSNorm: out = x * rsqrt(mean(x²) + eps) * weight */
@@ -133,9 +138,9 @@ static void forward_token(Weights *w, int tok, int pos,
         rmsnorm_p(xn, x, w->b[bl].norm1, E);
 
         float qa[1024], ka[1024], va[1024];
-        mm_t(qa, xn, w->b[bl].wq, 1, E, E);
-        mm_t(ka, xn, w->b[bl].wk, 1, E, E);
-        mm_t(va, xn, w->b[bl].wv, 1, E, E);
+        matvec_t(qa, w->b[bl].wq, xn, E, E);
+        matvec_t(ka, w->b[bl].wk, xn, E, E);
+        matvec_t(va, w->b[bl].wv, xn, E, E);
 
         /* RoPE per head (even/odd interleave on each head's D dims) */
         for (int h = 0; h < H; h++)
@@ -219,23 +224,23 @@ static void forward_token(Weights *w, int tok, int pos,
 
         /* === WO + residual === */
         float ao[1024];
-        mm_t(ao, blend, w->b[bl].wo, 1, E, E);
+        matvec_t(ao, w->b[bl].wo, blend, E, E);
         for (int e = 0; e < E; e++) x[e] += ao[e];
 
         /* === norm2 → SwiGLU → residual === */
         rmsnorm_p(xn, x, w->b[bl].norm2, E);
         float mg[2048], mu[2048], mo[1024];
-        mm_t(mg, xn, w->b[bl].mlp_gate, 1, E, M);
-        mm_t(mu, xn, w->b[bl].mlp_up,   1, E, M);
+        matvec_t(mg, w->b[bl].mlp_gate, xn, M, E);
+        matvec_t(mu, w->b[bl].mlp_up, xn, M, E);
         for (int i = 0; i < M; i++) mg[i] = siluf(mg[i]) * mu[i];
-        mm_t(mo, mg, w->b[bl].mlp_down, 1, M, E);
+        matvec_t(mo, w->b[bl].mlp_down, mg, E, M);
         for (int e = 0; e < E; e++) x[e] += mo[e];
     }
 
     /* Final norm + head */
     rmsnorm_p(xn, x, w->norm_f, E);
     if (hidden) memcpy(hidden, xn, E * sizeof(float));
-    mm_t(logits, xn, w->out_head, 1, E, V);
+    matvec_t(logits, w->out_head, xn, V, E);
 }
 
 /* ── Public API used from resonance.aml ─────────────────────────────── */
