@@ -22,8 +22,8 @@ Yent is two-faced: Janus 176M (yent.aml) and Resonance 200M (this repo). Both tr
 
 System-wide via `/opt/homebrew`, same baseline as yent.aml:
 
-- **[`ariannamethod/ariannamethod.ai`](https://github.com/ariannamethod/ariannamethod.ai)** ≥ v5.0.0-janus
-- **[`ariannamethod/notorch`](https://github.com/ariannamethod/notorch)** ≥ v5.0.0-janus
+- **[`ariannamethod/ariannamethod.ai`](https://github.com/ariannamethod/ariannamethod.ai)** (AML — `libaml`, `amlc`)
+- **[`ariannamethod/notorch`](https://github.com/ariannamethod/notorch)** (`libnotorch`)
 - **Apple Accelerate** (Darwin) or **OpenBLAS** (Linux). Auto-linked by `amlc`.
 
 ## Usage
@@ -50,7 +50,7 @@ A:" -n 100 -t 0.7 --top-p 0.9
 
 Third AML program is alive. Same toolchain as yent.aml: `.aml → amlc → C → cc + libnotorch + libaml + Accelerate`. AML script through `am_exec` configures the Dario field at runtime; `am_apply_field_to_logits` overlays Hebbian + prophecy + destiny + 6 Kuramoto chambers per token; `am_compute_prophecy_debt` + `am_step` tick the field forward each sample.
 
-**End-to-end on 8GB Mac M1:**
+**End-to-end on 8GB Mac:**
 
 ```
 [resonance] V=16384 E=768 H=12 D=64 B=20 M=2048 T=2048 R=48
